@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 import pystray
@@ -11,6 +12,8 @@ from .icon import make_icon_image
 from .popup import PopupManager
 from .scheduler import Scheduler
 from .sound import play_alarm_beep
+
+log = logging.getLogger(__name__)
 
 
 class TrayApp:
@@ -36,9 +39,20 @@ class TrayApp:
         return self.config["language"]
 
     def _notify(self, title, message):
-        notification.notify(title=title, message=message, app_name=title, timeout=10)
-        self.popup.show(title, message)
-        play_alarm_beep(self.config.get("custom_sound_path"))
+        # Each action is independent: a failure in one (e.g. Windows blocking
+        # the toast balloon) must not prevent the others from firing.
+        try:
+            notification.notify(title=title, message=message, app_name=title, timeout=10)
+        except Exception:
+            log.exception("notification.notify failed")
+        try:
+            self.popup.show(title, message)
+        except Exception:
+            log.exception("popup.show failed")
+        try:
+            play_alarm_beep(self.config.get("custom_sound_path"))
+        except Exception:
+            log.exception("play_alarm_beep failed")
 
     def _today_event_items(self):
         now_server = datetime.now(timezone.utc).astimezone(events_mod.SERVER_TZ)

@@ -1,7 +1,10 @@
+import logging
 import queue
 import threading
 import tkinter as tk
 from tkinter import filedialog
+
+log = logging.getLogger(__name__)
 
 DISPLAY_MS = 6000
 POLL_MS = 200
@@ -39,8 +42,12 @@ class PopupManager:
         return result.get()
 
     def _run(self):
-        self._root = tk.Tk()
-        self._root.withdraw()
+        try:
+            self._root = tk.Tk()
+            self._root.withdraw()
+        except tk.TclError:
+            log.exception("Failed to initialize Tk; popups disabled")
+            return
         self._poll()
         self._root.mainloop()
 
@@ -48,7 +55,10 @@ class PopupManager:
         try:
             while True:
                 title, message = self._queue.get_nowait()
-                self._show_popup(title, message)
+                try:
+                    self._show_popup(title, message)
+                except tk.TclError:
+                    log.exception("Failed to show popup")
         except queue.Empty:
             pass
         self._root.after(POLL_MS, self._poll)
